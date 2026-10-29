@@ -148,10 +148,23 @@ def create_invoice(request: CreateInvoiceRequest):
         raise HTTPException(status_code=400, detail=str(error))
 
 @router.post("/invoices/{invoice_id}/send")
-def send_invoice(invoice_id: str):
-    service = PayPalInvoiceService()
+def send_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+):
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.id ==invoice_id)
+        .first()
+    )
 
-    return service.send_invoice(invoice_id)
+    if not invoice:
+        raise HTTPException(
+            status_code=404,
+            detail="Invoice not found",
+        )
+    service = PayPalInvoiceService()
+    return service.send_invoice(invoice.paypal_invoice_id)
 
 @router.get("/review-history")
 def review_history(db: Session = Depends(get_db)):
