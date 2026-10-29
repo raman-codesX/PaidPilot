@@ -5,10 +5,7 @@ uvicorn
 sqlalchemy
 pandas
 scikit-learn==1.8.0
-sentence-transformers
 joblib
-faiss-cpu
-rank-bm25
 streamlit
 requests
 pydantic

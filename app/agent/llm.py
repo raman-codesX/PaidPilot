@@ -1,23 +1,24 @@
 import json
 import os
+
 from dotenv import load_dotenv
 from google import genai
 
 load_dotenv()
 
-def generate_collection_recommendation(
-    late_probability: float,
+
+def generate_ai_email(
+    invoice_id: int,
+    invoice_amount: float,
+    currency: str,
     invoice_status: str,
-    customer_context: list[dict],
-    draft_action: str,
-    invoice_reference: str | None = None,
-    invoice_amount: float | None = None,
-    currency: str | None = None,
-    due_date: str | None = None,
-    verified_extension: bool | None = None,
-    extension_evidence: str = "",
+    due_date: str | None,
+    days_overdue: int,
+    action: str,
+    customer_name: str | None = None,
+    customer_email: str | None = None,
 ) -> dict:
-    """Ask the local LLM to classify context and draft for a selected action."""
+    """Generate a personalized customer-facing invoice email using Gemini."""
 
     allowed_actions = {
         "DO_NOTHING",
@@ -25,122 +26,86 @@ def generate_collection_recommendation(
         "FIRM_REMINDER",
         "PAYMENT_PLAN",
     }
-    if draft_action not in allowed_actions:
-        raise ValueError("Unknown draft action.")
 
-    amount_text = (
-        str(invoice_amount) if invoice_amount is not None else "not provided"
-    )
+    if action not in allowed_actions:
+        raise ValueError("Unknown email action.")
 
-    context_text = json.dumps(
-        customer_context,
-        ensure_ascii=False,
-        indent=2,
-    )
+    if action == "DO_NOTHING":
+        raise ValueError("Cannot generate an email for DO_NOTHING.")
+
+    customer_name_text = customer_name or "Customer"
+    customer_email_text = customer_email or "not provided"
 
     prompt = f"""
-You are an AI assistant helping a business owner communicate with customers about invoices.
+You are an AI assistant helping a business owner write a professional
+invoice follow-up email.
 
-The deterministic policy has already selected the action:
-{draft_action}
+The business owner's deterministic policy has already selected this action:
+{action}
 
-The action is FINAL. You must NOT change, reinterpret, or recommend a different action.
-
-Action rules:
-- FRIENDLY_REMINDER: politely remind the customer about the invoice and request payment.
-- FIRM_REMINDER: clearly and professionally request payment for an overdue invoice.
-- PAYMENT_PLAN: politely discuss arranging a payment schedule. If verified customer context contains a specific requested schedule, use it. Otherwise, ask what payment schedule would work for the customer.
-- DO_NOTHING: do not create a customer-facing message.
+The action is FINAL. Do not change or reinterpret it.
 
 Invoice information:
-- Invoice reference: {invoice_reference}
+- Invoice ID: {invoice_id}
 - Amount: {invoice_amount} {currency}
-- Invoice status: {invoice_status}
-- Due date: {due_date}
+- Status: {invoice_status}
+- Due date: {due_date or "not provided"}
+- Days overdue: {days_overdue}
 
-Verified customer context:
-{customer_context}
+Customer information:
+- Customer name: {customer_name_text}
+- Customer email: {customer_email_text}
 
-Important rules:
-1. Write ONLY the email body.
-2. Do NOT include a greeting.
-3. Do NOT include a sign-off.
-4. Do NOT include a customer name or company name.
-5. Do NOT use placeholders such as [Customer Name], [Your Name], or [Company Name].
-6. The application will add the greeting and sign-off separately.
-7. Write 2–4 natural, professional sentences.
-8. Keep the message concise, around 40–70 words.
-9. For PAYMENT_PLAN, ask about a suitable payment schedule unless verified customer context provides specific payment-plan terms.
-10. Never invent payment dates, deadlines, penalties, fees, payment-plan terms, approvals, or promises.
-11. Do not mention the late-payment probability.
-12. Use only the verified customer context provided above.
-13. Do not claim that an email was sent or that any action was completed.
-14. If the invoice is overdue, clearly acknowledge that it is overdue.
-15. Do not describe the action itself as an invoice status. For example, do not say the invoice is "in PAYMENT_PLAN status".
-16. Return ONLY valid JSON.
+Rules:
+1. Write a concise, professional, natural email.
+2. Personalize the email using the customer information when available.
+3. Clearly acknowledge that the invoice is overdue when days overdue is greater than 0.
+4. For FRIENDLY_REMINDER, use a polite and non-aggressive tone.
+5. For FIRM_REMINDER, be clear and professional about requesting payment.
+6. For PAYMENT_PLAN, politely discuss arranging a payment schedule.
+7. Never invent payment dates, deadlines, penalties, fees, discounts, or promises.
+8. Do not mention late-payment probability or internal risk scores.
+9. Do not claim that an email was already sent.
+10. Do not change the selected action.
+11. Return only valid JSON.
 
-Return exactly this JSON structure:
+Return exactly:
 {{
-  "reason": "brief explanation of why this message fits the selected action",
-  "draft_message": "email body only",
-  "extension_requested": false,
-  "extension_evidence": ""
+    "subject": "email subject",
+    "draft_message": "complete email body",
+    "reason": "brief explanation of why this email fits the selected action"
 }}
 """
 
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     response = client.models.generate_content(
-        model="gemini-3.8-flash",
+        model="gemini-3.5-flash",
         contents=prompt,
         config={
-        "max_output_tokens": 200,
+            "max_output_tokens": 1000,
+            "response_mime_type": "application/json",
         },
     )
 
-    text = response.text
-    recommendation = json.loads(text)
-
-    required_keys = {
-        "reason",
-        "draft_message",
-        "extension_requested",
-        "extension_evidence",
-    }
+    recommendation = json.loads(response.text)
 
     if not isinstance(recommendation, dict):
         raise ValueError("LLM response must be a JSON object.")
+
+    required_keys = {
+        "subject",
+        "draft_message",
+        "reason",
+    }
 
     if not required_keys.issubset(recommendation):
         raise ValueError("LLM response is missing required fields.")
 
     if not all(
         isinstance(recommendation[key], str)
-        for key in {
-            "reason",
-            "draft_message",
-            "extension_evidence",
-        }
+        for key in required_keys
     ):
         raise ValueError("LLM text fields must be strings.")
-
-    if isinstance(recommendation["extension_requested"], str):
-        value = recommendation["extension_requested"].strip().lower()
-
-        if value == "true":
-            recommendation["extension_requested"] = True
-        elif value == "false":
-            recommendation["extension_requested"] = False
-        else:
-            raise ValueError("extension_requested must be a boolean.")
-
-    if not isinstance(recommendation["extension_requested"], bool):
-        raise ValueError("extension_requested must be a boolean.")
-    
-    if verified_extension is not None:
-        recommendation["extension_requested"] = verified_extension
-        recommendation["extension_evidence"] = (
-            extension_evidence if verified_extension else ""
-        )
 
     return recommendation

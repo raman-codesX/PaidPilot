@@ -13,12 +13,34 @@ class PayPalInvoiceService:
 
     def create_invoice(
         self,
+        customer_name: str,
         recipient_email: str,
         amount: str,
         currency: str = "USD",
         description: str = "PaidPilot test invoice",
         due_date: str | None = None,
     ):
+
+        db = SessionLocal()
+
+        try:
+            existing_invoices = (
+                db.query(Invoice)
+                .filter(Invoice.customer_email == recipient_email)
+                .all()
+            )
+            for existing_invoice in existing_invoices:
+               if (
+                    existing_invoice.customer_name
+                    and existing_invoice.customer_name != customer_name
+                ):
+                    raise ValueError(
+                        f"This email is already associated with "
+                        f"{existing_invoice.customer_name}."
+                    )
+        finally:
+            db.close()
+
         token = self.paypal.get_access_token()
 
         url = f"{self.base_url}/v2/invoicing/invoices"
@@ -113,6 +135,7 @@ class PayPalInvoiceService:
         try:
             invoice = Invoice(
                 paypal_invoice_id=invoice_id,
+                customer_name=customer_name,
                 customer_email=recipient_email,
                 amount=float(amount),
                 currency=currency,
@@ -127,9 +150,7 @@ class PayPalInvoiceService:
         finally:
             db.close()
 
-        print("\n===== PAYPAL CREATE RESPONSE =====")
         print(data)
-        print("==================================\n")
 
         return data
 
@@ -151,10 +172,8 @@ class PayPalInvoiceService:
         )
 
         if not response.is_success:
-            print("\n===== PAYPAL SEND ERROR =====")
-            print("Status:", response.status_code)
             print("Response:", response.text)
-            print("=============================\n")
+
 
         response.raise_for_status()
 

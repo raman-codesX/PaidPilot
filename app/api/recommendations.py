@@ -3,13 +3,13 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.models import Invoice, ActionHistory 
 from app.db.session import SessionLocal
 from app.agent.graph import recommend_action_from_invoice
-from app.agent.llm import generate_collection_recommendation
+from app.agent.llm import generate_ai_email
 from app.agent.email_templates import build_email
 from app.gmail.client import send_email
 
@@ -80,9 +80,6 @@ def get_db():
 
 class RecommendationRequest(BaseModel):
     invoice_id: int
-    query: str = (
-        "Assess payment risk and recommend an appropriate collection action."
-    )
 
 class EmailGenerationRequest(BaseModel):
     invoice_id: int
@@ -121,17 +118,12 @@ def generate_recommendation(
             avg_previous_delay=history["avg_previous_delay"],
             invoice_status=invoice.status.upper(),
             reminder_count=0,
-            customer_id=None,
-            customer_email=invoice.customer_email,
-            query=request.query,
-            invoice_reference=invoice.paypal_invoice_id,
-            currency=invoice.currency,
-            due_at=invoice.due_at,
         )
 
         return {
             "invoice_id": invoice.id,
             "paypal_invoice_id": invoice.paypal_invoice_id,
+            "customer_name": invoice.customer_name,
             "customer_email": invoice.customer_email,
             "amount": invoice.amount,
             "currency": invoice.currency,
@@ -142,6 +134,55 @@ def generate_recommendation(
         raise HTTPException(
             status_code=500,
             detail=f"Recommendation generation failed: {error}",
+        ) from error
+
+@router.post("/ai-email")
+def generate_ai_email_endpoint(
+    request: EmailGenerationRequest,
+    db: Session = Depends(get_db),
+):
+    invoice = db.query(Invoice).filter(
+        Invoice.id == request.invoice_id
+    ).first()
+
+    if invoice is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Invoice not found",
+        )
+
+    try:
+        days_overdue = max(
+            (datetime.now() - invoice.due_at).days,
+            0,
+        ) if invoice.due_at else 0
+
+        email = generate_ai_email(
+            invoice_id=invoice.id,
+            invoice_amount=invoice.amount,
+            currency=invoice.currency,
+            invoice_status=invoice.status.upper(),
+            due_date=(
+                invoice.due_at.strftime("%Y-%m-%d")
+                if invoice.due_at
+                else None
+            ),
+            days_overdue=days_overdue,
+            action=request.action,
+            customer_name=invoice.customer_name,
+            customer_email=invoice.customer_email,
+        )
+
+        return {
+            "invoice_id": invoice.id,
+            "customer_email": invoice.customer_email,
+            **email,
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI email generation failed: {error}",
         ) from error
 
 
@@ -161,39 +202,6 @@ def generate_email(
         )
 
     try:
-        history = _history_for_invoice(
-            invoice,
-            db.query(Invoice).all(),
-        )
-
-        # Reuse the same RAG context used by the recommendation agent.
-        from app.rag.hybrid_retriever import retrieve_hybrid_context
-
-        customer_context = retrieve_hybrid_context(
-            customer_id=None,
-            query=(
-                "Review verified customer notes for payment timing, "
-                "payment issues, or extension requests."
-            ),
-            customer_email=invoice.customer_email,
-        )
-
-        late_probability = 0.0
-
-        # The recommendation endpoint already calculated the action,
-        # but the email endpoint needs the risk probability again.
-        from app.ml.predict import predict_late_payment
-
-        prediction = predict_late_payment(
-            invoice_amount=invoice.amount,
-            previous_invoices=history["previous_invoices"],
-            previous_late_payments=history["previous_late_payments"],
-            previous_late_rate=history["previous_late_rate"],
-            avg_previous_delay=history["avg_previous_delay"],
-        )
-
-        late_probability = prediction["late_probability"]
-
         is_overdue = bool(
             invoice.due_at and datetime.now() > invoice.due_at
         )
@@ -298,6 +306,7 @@ def generate_portfolio_recommendations(
             "recommendation_id": str(uuid4()),
             "invoice_id": invoice.id,
             "paypal_invoice_id": invoice.paypal_invoice_id,
+            "customer_name": invoice.customer_name,
             "customer_email": invoice.customer_email,
             "amount": invoice.amount,
             "currency": invoice.currency,
@@ -317,16 +326,6 @@ def generate_portfolio_recommendations(
                 avg_previous_delay=history["avg_previous_delay"],
                 invoice_status=(invoice.status or "").upper(),
                 reminder_count=0,
-                customer_id=None,
-                customer_email=invoice.customer_email,
-                invoice_reference=invoice.paypal_invoice_id,
-                currency=invoice.currency,
-                due_at=invoice.due_at,
-                query=(
-                    "Review verified customer notes for payment timing or an "
-                    "extension request. Recommend an appropriate collection "
-                    "draft consistent with the deterministic risk policy."
-                ),
             )
             item.update(result)
         except Exception as error:

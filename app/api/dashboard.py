@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,7 @@ from app.paypal.invoices import PayPalInvoiceService
 router = APIRouter(prefix="/api", tags=["Dashboard"])
 
 class CreateInvoiceRequest(BaseModel):
+    customer_name: str
     recipient_email: str
     amount: str
     description: str = "PaidPilot test invoice"
@@ -135,12 +136,16 @@ def list_clients(db: Session = Depends(get_db)):
 def create_invoice(request: CreateInvoiceRequest):
     service = PayPalInvoiceService()
 
-    return service.create_invoice(
-        recipient_email=request.recipient_email,
-        amount=request.amount,
-        description=request.description,
-        due_date=request.due_date,
-    )
+    try:
+        return service.create_invoice(
+            customer_name=request.customer_name,
+            recipient_email=request.recipient_email,
+            amount=request.amount,
+            description=request.description,
+            due_date=request.due_date,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 @router.post("/invoices/{invoice_id}/send")
 def send_invoice(invoice_id: str):

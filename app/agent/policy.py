@@ -14,7 +14,6 @@ def evaluate_action(
     late_probability: float,
     invoice_status: str,
     reminder_count: int,
-    extension_requested: bool = False
 ):
     """Deterministic safety policy for PaidPilot."""
 
@@ -47,17 +46,6 @@ def evaluate_action(
     # Reminder limit always applies, including context-based exceptions.
     if action in REMINDER_ACTIONS and reminder_count >= MAX_REMINDERS:
         return deny("Reminder limit reached.")
-
-    # A verified extension request always keeps the follow-up friendly,
-    # regardless of risk. Reminder limits still apply above.
-    if (
-        action == "FRIENDLY_REMINDER"
-        and extension_requested
-    ):
-        return allow(
-            "Friendly follow-up allowed because the customer requested "
-            "an extension. Human approval is still required."
-        )
 
     # Risk band check
     low, high = RISK_BANDS[action]

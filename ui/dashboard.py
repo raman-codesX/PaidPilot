@@ -324,37 +324,76 @@ def render_recommendation_card(item, decisions_by_id):
                 st.success("Message sent successfully.")
 
     else:
-        if st.button(
-            "Generate Email",
-            type="primary",
-            key=f"generate-email-{recommendation_id}",
-        ):
-            email_data, email_error = api_request(
-                "POST",
-                "/api/recommendations/email",
-                payload=payload,
-                timeout=30,
-            )
+        customize_col, ai_col = st.columns(2)
+        with customize_col:
 
-            if email_error:
-                st.error(f"Email generation failed: {email_error}")
-            else:
-                item["llm_recommendation"] = {
-                    "draft_message": email_data.get(
-                        "draft_message",
-                        "",
-                    ),
-                    "subject": email_data.get(
-                        "subject",
-                        "",
-                    ),
-                    "reason": email_data.get(
-                        "reason",
-                        "",
-                    ),
-                }
+            if st.button(
+                "Customize Email",
+                type="primary",
+                key=f"generate-email-{recommendation_id}",
+            ):
+                email_data, email_error = api_request(
+                    "POST",
+                    "/api/recommendations/email",
+                    payload=payload,
+                    timeout=30,
+                )
 
-                st.rerun()
+                if email_error:
+                    st.error(
+                        f"Email generation failed: {email_error}"
+                    )
+                else:
+                    item["llm_recommendation"] = {
+                        "draft_message" : email_data.get(
+                            "draft_message",
+                            "",
+                        ),
+                        "subject" : email_data.get(
+                            "subject",
+                            "",
+                        ),
+                        "reason" : email_data.get(
+                            "reason",
+                            "",
+                        ),
+                    }
+
+                    st.rerun()
+
+        with ai_col:
+            if st.button(
+                "Generate AI Email",
+                type="primary",
+                key=f"generate-ai-email-{recommendation_id}",
+            ):
+                with st.spinner("Generating personalized AI email..."):
+                    email_data, email_error = api_request(
+                        "POST",
+                        "/api/recommendations/ai-email",
+                        payload=payload,
+                        timeout=120,
+                    )
+
+                if email_error:
+                    st.error(f"Email generation failed: {email_error}")
+                else:
+                    item["llm_recommendation"] = {
+                        "draft_message": email_data.get(
+                            "draft_message",
+                            "",
+                        ),
+                        "subject": email_data.get(
+                            "subject",
+                            "",
+                        ),
+                        "reason": email_data.get(
+                            "reason",
+                            "",
+                        ),
+                    }
+
+                    st.rerun()
     
     payload = {
         "recommendation_id": recommendation_id,
@@ -366,11 +405,28 @@ def render_recommendation_card(item, decisions_by_id):
 
 
     st.markdown("### Why this tone?")
-    st.caption(
-        f"PaidPilot selected **{recommendation_label(action)}** because "
-        f"the predicted late-payment risk is **{risk:.0%} ({level})**."
-    )
 
+    overdue_days = int(item.get("overdue_days") or 0)
+    previous_invoices = int(item.get("previous_invoices") or 0)
+
+    if previous_invoices == 0 and overdue_days > 0:
+        tone_reason = (
+            f"this invoice is {overdue_days} day(s) overdue, "
+            f"but this is a new invoice, so PaidPilot starts with a friendly reminder."
+        )
+    elif previous_invoices > 0 and overdue_days > 0:
+        tone_reason = (
+            f"this invoice is {overdue_days} day(s) overdue, "
+            f"so PaidPilot selected this action."
+        )
+    else:
+        tone_reason = (
+            f"PaidPilot selected **{recommendation_label(action)}** because "
+            f"the predicted late-payment risk is **{risk:.0%} ({level})**."
+        )
+    st.caption(
+        f"PaidPilot selected **{recommendation_label(action)}** because {tone_reason}"
+    )
     st.markdown("### Client history")
 
     history = item.get("previous_invoices", 0)
@@ -402,7 +458,7 @@ def render_recommendation_card(item, decisions_by_id):
         )
         return
 
-    with st.expander("Risk, history, and customer context"):
+    with st.expander("Risk, history, and policy"):
         st.markdown("### Payment history")
 
         history = item.get("previous_invoices", 0)
@@ -412,21 +468,6 @@ def render_recommendation_card(item, decisions_by_id):
             f"**{history}** completed invoice(s) · "
             f"**{late}** late payment(s)"
         )
-
-        st.markdown("### Customer context")
-
-        contexts = item.get("customer_context") or []
-
-        if contexts:
-            for context in contexts:
-                st.caption(
-                    f"{context.get('type', 'Context')}: "
-                    f"{context.get('text', '')}"
-                )
-        else:
-            st.info(
-                "No verified customer context was matched to this invoice."
-            )
 
         st.markdown("### Policy")
 
@@ -619,7 +660,8 @@ def render_overview(summary, summary_error, recommendations, recommendation_erro
     h5.markdown("**ACTION**")
 
     for item in ranked:
-        customer = item.get("customer_email") or "Unknown client"
+        customer_name = item.get("customer_name") or "Unknown client"
+        customer_email = item.get("customer_email") or "Unknown client"
         reference = item.get("paypal_invoice_id") or f"Invoice {item.get('invoice_id')}"
         amount = format_amount(item.get("amount"), item.get("currency"))
         due_date = format_due_date(item.get("due_at"))
@@ -657,8 +699,8 @@ def render_overview(summary, summary_error, recommendations, recommendation_erro
             st.markdown(
                 f"""
                 <div class="pp-table-client">
-                    <strong>{html.escape(customer)}</strong>
-                    <span>{html.escape(reference)}</span>
+                    <strong>{html.escape(customer_name)}</strong>
+                    <span>{html.escape(customer_email)}</span>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -729,13 +771,18 @@ def render_recommendations(data, error):
         action = item.get("action", "DO_NOTHING")
 
         st.divider()
-
+        overdue_days = int(item.get("overdue_days") or 0)
         st.subheader(f"Invoice #{invoice_id}")
-
-        st.write(f"**Customer:** {customer}")
-        st.write(f"**Amount:** {amount}")
-        st.write(f"**Late-payment risk:** {risk:.0%} ({risk_level})")
-        st.write(f"**Recommended action:** {recommendation_label(action)}")
+        if overdue_days > 0:
+            st.write(f"**Customer:** {customer}")
+            st.write(f"**Amount:** {amount}")
+            st.write(f"**Overdue Days:** {overdue_days}")
+            st.write(f"**Recommended action:** {recommendation_label(action)}")
+        else:
+            st.write(f"**Customer:** {customer}")
+            st.write(f"**Amount:** {amount}")
+            st.write(f"**Late-payment risk:** {risk:.0%} ({risk_level})")
+            st.write(f"**Recommended action:** {recommendation_label(action)}")
 
         if action == "DO_NOTHING":
             st.info("No action recommended.")
@@ -858,6 +905,7 @@ def render_invoices(data, error):
                         use_container_width=True,
                     ):
                         payload = {
+                            "customer_name": draft["customer_name"],
                             "recipient_email": draft["customer_email"],
                             "amount": str(draft["amount"]),
                             "description": draft["description"],

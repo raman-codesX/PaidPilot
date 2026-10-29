@@ -53,6 +53,11 @@ class Invoice(Base):
         index=True,
     )
 
+    customer_name = Column(
+        String,
+        nullable=True,
+    )
+
     customer_email = Column(
         String,
         nullable=True,
