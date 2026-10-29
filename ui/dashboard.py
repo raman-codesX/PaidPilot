@@ -922,7 +922,7 @@ def render_invoices(data, error):
                         if error:
                             st.error(f"Could not create invoice: {error}")
                         else:
-                            invoice_id = response.get("id")
+                            invoice_id = response.get("local_invoice_id")
 
                             send_response, send_error = api_request(
                                 "POST",

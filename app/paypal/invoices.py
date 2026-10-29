@@ -146,6 +146,7 @@ class PayPalInvoiceService:
 
             db.add(invoice)
             db.commit()
+            data["local_invoice_id"] = invoice.id
 
         finally:
             db.close()
