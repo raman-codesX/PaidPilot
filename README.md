@@ -392,7 +392,6 @@ python test_paypal.py
 - [x] Gemini and rule-based email drafting
 - [x] Streamlit review dashboard
 - [ ] Enforce saved approval decisions at the email-send API boundary
-- [ ] Add the missing Google/Gmail/Gemini dependencies to `requirements.txt`
 - [ ] Add stronger customer identity and data validation
 - [ ] Add API and integration tests for PayPal, webhooks, approvals, and email sending
 - [ ] Add authentication and authorization for production deployment
