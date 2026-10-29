@@ -380,7 +380,6 @@ python test_paypal.py
 - Customer identity handling is limited to an email/name consistency check during invoice creation.
 - Gmail requires local OAuth credentials (`credentials.json` and `token.json`).
 - `.env.example` does not include `PAIDPILOT_API_URL`, although the UI supports it.
-- `requirements.txt` omits `google-genai`, `google-auth`, `google-auth-oauthlib`, and `google-api-python-client`. Install them manually (see [Installation](#installation)).
 - The app targets the PayPal Sandbox by default and has no authentication or authorization layer for production deployment.
 
 ---
