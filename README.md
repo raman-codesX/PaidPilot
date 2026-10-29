@@ -4,9 +4,9 @@
 
 **AI-powered, human-in-the-loop payment collections assistant for PayPal invoices**
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/raman-codesX/PaidPilot/[REPLACE ME: ci.yml]?branch=main)](https://github.com/raman-codesX/PaidPilot/actions)
-[![License](https://img.shields.io/badge/license-[REPLACE ME: MIT]-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-[REPLACE ME: 0.1.0]-green.svg)](https://github.com/raman-codesX/PaidPilot/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](https://github.com/raman-codesX/PaidPilot/releases)
+[![Python](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 
 </div>
 
@@ -47,7 +47,7 @@
 
 > **Core idea:** AI helps prioritize and draft payment follow-ups; the business owner remains responsible for the final customer-facing action.
 
-**Status:** PaidPilot is a hackathon-oriented prototype. It is not presented as a production-ready financial automation system.
+**Status:** PaidPilot v0.1.0 is a hackathon-oriented prototype. It is not presented as a production-ready financial automation system.
 
 ---
 
@@ -58,23 +58,23 @@
 - **Deterministic action policy**: Risk probability maps to a fixed collection action (`DO_NOTHING`, `FRIENDLY_REMINDER`, `FIRM_REMINDER`, `PAYMENT_PLAN`).
 - **Email drafting**: Gemini-powered drafts, plus rule-based templates for each reminder type.
 - **Human review**: Approval or rejection decisions are recorded before the user chooses to send.
-- **Gmail sending**: Send approved drafts through the Gmail API.
+- **Gmail sending**: Send reviewed drafts through the Gmail API.
 - **Streamlit dashboard**: Overview, Recommendations, Invoices, Clients, and Review history pages.
 
 ---
 
 ## Tech Stack
 
-| Layer            | Technology                                          |
-| ---------------- | --------------------------------------------------- |
-| Language         | Python [REPLACE ME: version]                        |
-| Backend          | FastAPI, Uvicorn                                    |
-| Frontend         | Streamlit                                           |
-| Database         | SQLite (via SQLAlchemy)                             |
-| Machine learning | scikit-learn                                        |
-| AI drafting      | Google Gemini (`gemini-3.5-flash`)                  |
-| Integrations     | PayPal REST API (Sandbox), Gmail API                |
-| Testing          | pytest                                              |
+| Layer            | Technology                           |
+| ---------------- | ------------------------------------ |
+| Language         | Python 3.13                          |
+| Backend          | FastAPI, Uvicorn                     |
+| Frontend         | Streamlit                            |
+| Database         | SQLite (via SQLAlchemy)              |
+| Machine learning | scikit-learn                         |
+| AI drafting      | Google Gemini (`gemini-3.5-flash`)   |
+| Integrations     | PayPal REST API (Sandbox), Gmail API |
+| Testing          | pytest                               |
 
 ---
 
@@ -200,7 +200,7 @@ This is **not** comprehensive identity verification.
 
 ### Prerequisites
 
-- Python [REPLACE ME: version, e.g. 3.12]
+- Python 3.13
 - A PayPal Developer account with Sandbox REST API credentials
 - A Gemini API key (for AI email drafting)
 - Gmail OAuth credentials (`credentials.json`) for sending email
@@ -247,14 +247,14 @@ This is **not** comprehensive identity verification.
 
 Set the following variables in `.env`:
 
-| Variable               | Description                                              | Required | Default                           |
-| ---------------------- | -------------------------------------------------------- | -------- | --------------------------------- |
-| `PAYPAL_CLIENT_ID`     | PayPal REST API client ID                                | Yes      | None                              |
-| `PAYPAL_CLIENT_SECRET` | PayPal REST API client secret                            | Yes      | None                              |
-| `PAYPAL_BASE_URL`      | PayPal API base URL                                      | No       | `https://api-m.sandbox.paypal.com` |
-| `PAYPAL_WEBHOOK_ID`    | PayPal webhook ID used for signature verification        | Yes      | None                              |
-| `GEMINI_API_KEY`       | Gemini API key for AI email drafting                     | Yes      | None                              |
-| `PAIDPILOT_API_URL`    | Backend URL used by the Streamlit UI (not in `.env.example`) | No   | `http://127.0.0.1:8000`           |
+| Variable               | Description                                                  | Required | Default                            |
+| ---------------------- | ------------------------------------------------------------ | -------- | ---------------------------------- |
+| `PAYPAL_CLIENT_ID`     | PayPal REST API client ID                                    | Yes      | None                               |
+| `PAYPAL_CLIENT_SECRET` | PayPal REST API client secret                                | Yes      | None                               |
+| `PAYPAL_BASE_URL`      | PayPal API base URL                                          | No       | `https://api-m.sandbox.paypal.com` |
+| `PAYPAL_WEBHOOK_ID`    | PayPal webhook ID used for signature verification            | Yes      | None                               |
+| `GEMINI_API_KEY`       | Gemini API key for AI email drafting                         | Yes      | None                               |
+| `PAIDPILOT_API_URL`    | Backend URL used by the Streamlit UI (not in `.env.example`) | No       | `http://127.0.0.1:8000`            |
 
 **Gmail credentials:** Gmail sending reads OAuth credentials from `credentials.json` and `token.json` and requests the `gmail.send` scope. These are local credentials and must not be committed.
 
@@ -287,7 +287,7 @@ streamlit run ui/dashboard.py
 Typical workflow in the dashboard:
 
 1. **Invoices**: create and send a PayPal invoice.
-2. **Recommendations**: review the portfolio of open invoices with their risk and recommended action.
+2. **Recommendations**: review open invoices with their risk and recommended action.
 3. Review the generated email draft and record an approval or rejection.
 4. Choose whether to send the email through Gmail.
 5. **Review history**: audit recorded actions.
@@ -296,6 +296,13 @@ To point the dashboard at a different backend:
 
 ```bash
 PAIDPILOT_API_URL=http://your-host:8000 streamlit run ui/dashboard.py
+```
+
+On Windows (cmd):
+
+```cmd
+set PAIDPILOT_API_URL=http://your-host:8000
+streamlit run ui/dashboard.py
 ```
 
 ---
@@ -411,14 +418,14 @@ Please make sure `pytest` passes and follow the existing code style. For larger 
 
 ## License
 
-Distributed under the **[REPLACE ME: MIT / Apache-2.0 / etc.]** License. See [LICENSE](LICENSE) for more information.
+Distributed under the **MIT** License. See [LICENSE](LICENSE) for more information.
 
 ---
 
 ## Contact
 
-**[REPLACE ME: Author name]**
+**Raman**
 
-- Email: [REPLACE ME: email]
+- Email: namansingh982150@gmail.com
 - GitHub: [@raman-codesX](https://github.com/raman-codesX)
 - Project link: https://github.com/raman-codesX/PaidPilot
