@@ -9,3 +9,8 @@ joblib
 streamlit
 requests
 pydantic
+google-genai
+google-auth
+google-auth-oauthlib
+google-api-python-client
+pytest
