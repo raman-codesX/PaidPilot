@@ -397,7 +397,6 @@ python test_paypal.py
 - The email-send API does not enforce that a saved approval decision exists before sending.
 - Customer identity handling is limited to an email/name consistency check during invoice creation.
 - Gmail requires local OAuth credentials (`credentials.json` and `token.json`).
-- `.env.example` does not include `PAIDPILOT_API_URL`, although the UI supports it.
 - Data is stored in local SQLite and is not persistent on the Render Free plan.
 - The app targets the PayPal Sandbox by default and has no authentication or authorization layer for production deployment.
 
