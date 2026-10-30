@@ -18,15 +18,16 @@
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [How It Works](#how-it-works)
-- [Risk and Action Policy](#risk-and-action-policy)
-- [Human Review and Email Sending](#human-review-and-email-sending)
-- [Customer Identity Check](#customer-identity-check)
+  - [Risk and Action Policy](#risk-and-action-policy)
+  - [Human Review and Email Sending](#human-review-and-email-sending)
+  - [Customer Identity Check](#customer-identity-check)
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
 - [Usage](#usage)
+- [Deployment](#deployment)
 - [Project Structure](#project-structure)
 - [Testing](#testing)
 - [Known Limitations](#known-limitations)
@@ -46,6 +47,8 @@
 **Who it's for:** Freelancers and small businesses that invoice customers through PayPal.
 
 > **Core idea:** AI helps prioritize and draft payment follow-ups; the business owner remains responsible for the final customer-facing action.
+
+**Live demo:** [Dashboard](https://paidpilot-ui.onrender.com) · [API](https://paidpilot-8q3o.onrender.com)
 
 **Status:** PaidPilot v0.1.0 is a hackathon-oriented prototype. It is not presented as a production-ready financial automation system.
 
@@ -74,6 +77,7 @@
 | Machine learning | scikit-learn                         |
 | AI drafting      | Google Gemini (`gemini-3.5-flash`)   |
 | Integrations     | PayPal REST API (Sandbox), Gmail API |
+| Hosting          | Render                               |
 | Testing          | pytest                               |
 
 ---
@@ -229,13 +233,7 @@ This is **not** comprehensive identity verification.
    pip install -r requirements.txt
    ```
 
-4. Install the Google packages that `requirements.txt` does not currently list:
-
-   ```bash
-   pip install google-genai google-auth google-auth-oauthlib google-api-python-client
-   ```
-
-5. Create your environment file from the example:
+4. Create your environment file from the example:
 
    ```bash
    cp .env.example .env
@@ -304,6 +302,28 @@ On Windows (cmd):
 set PAIDPILOT_API_URL=http://your-host:8000
 streamlit run ui/dashboard.py
 ```
+
+---
+
+## Deployment
+
+PaidPilot is deployed on [Render](https://render.com) as two web services on the Free plan: the FastAPI backend and the Streamlit dashboard.
+
+| Service              | Live URL                            | Start command                                                                |
+| -------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| Backend (FastAPI)    | https://paidpilot-8q3o.onrender.com | `uvicorn app.api.main:app --host 0.0.0.0 --port $PORT`                       |
+| Frontend (Streamlit) | https://paidpilot-ui.onrender.com   | `streamlit run ui/dashboard.py --server.address 0.0.0.0 --server.port $PORT` |
+
+**Build command (both services):** `pip install -r requirements.txt`
+
+**Setup notes:**
+
+- Add the environment variables from [Configuration](#configuration) to the backend service in the Render dashboard.
+- On the frontend service, set `PAIDPILOT_API_URL` to `https://paidpilot-8q3o.onrender.com`.
+- The PayPal webhook endpoint is `https://paidpilot-8q3o.onrender.com/webhooks/paypal`. Register this URL in your PayPal Sandbox app and set the webhook ID in `PAYPAL_WEBHOOK_ID`.
+- Gmail sending expects `credentials.json` and `token.json` on the backend. Do not commit them. Provide them through Render secret files or another secure method.
+- Free services spin down when idle, so the first request after a pause can be slow.
+- The app stores data in a local SQLite file (`./paidpilot.db`) and no persistent disk is attached. Invoices and history can be lost when the service restarts, spins down, or redeploys.
 
 ---
 
@@ -380,6 +400,7 @@ python test_paypal.py
 - Customer identity handling is limited to an email/name consistency check during invoice creation.
 - Gmail requires local OAuth credentials (`credentials.json` and `token.json`).
 - `.env.example` does not include `PAIDPILOT_API_URL`, although the UI supports it.
+- Data is stored in local SQLite and is not persistent on the Render Free plan.
 - The app targets the PayPal Sandbox by default and has no authentication or authorization layer for production deployment.
 
 ---
@@ -390,7 +411,9 @@ python test_paypal.py
 - [x] Late-payment prediction and deterministic action policy
 - [x] Gemini and rule-based email drafting
 - [x] Streamlit review dashboard
+- [x] Deployment on Render (backend and frontend)
 - [ ] Enforce saved approval decisions at the email-send API boundary
+- [ ] Move storage to a persistent database
 - [ ] Add stronger customer identity and data validation
 - [ ] Add API and integration tests for PayPal, webhooks, approvals, and email sending
 - [ ] Add authentication and authorization for production deployment
