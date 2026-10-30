@@ -5,7 +5,6 @@ import os
 id="m2o5z8"
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./paidpilot.db")
 
-
 connect_args = {}
 
 if DATABASE_URL.startswith("sqlite"):
