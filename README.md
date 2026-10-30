@@ -318,7 +318,7 @@ PaidPilot is deployed on [Render](https://render.com) as two web services on the
 
 **Setup notes:**
 
-- Add the environment variables from [Configuration](#configuration) to the backend service in the Render dashboard.
+- Add the PayPal and Gemini variables to the backend service. Set PAIDPILOT_API_URL=https://paidpilot-8q3o.onrender.com on the frontend service
 - On the frontend service, set `PAIDPILOT_API_URL` to `https://paidpilot-8q3o.onrender.com`.
 - The PayPal webhook endpoint is `https://paidpilot-8q3o.onrender.com/webhooks/paypal`. Register this URL in your PayPal Sandbox app and set the webhook ID in `PAYPAL_WEBHOOK_ID`.
 - Gmail sending expects `credentials.json` and `token.json` on the backend. Do not commit them. Provide them through Render secret files or another secure method.
