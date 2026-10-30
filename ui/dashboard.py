@@ -421,7 +421,6 @@ def render_recommendation_card(item, decisions_by_id):
         )
     else:
         tone_reason = (
-            f"PaidPilot selected **{recommendation_label(action)}** because "
             f"the predicted late-payment risk is **{risk:.0%} ({level})**."
         )
     st.caption(
