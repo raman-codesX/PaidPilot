@@ -319,7 +319,6 @@ PaidPilot is deployed on [Render](https://render.com) as two web services on the
 **Setup notes:**
 
 - Add the PayPal and Gemini variables to the backend service. Set PAIDPILOT_API_URL=https://paidpilot-8q3o.onrender.com on the frontend service
-- On the frontend service, set `PAIDPILOT_API_URL` to `https://paidpilot-8q3o.onrender.com`.
 - The PayPal webhook endpoint is `https://paidpilot-8q3o.onrender.com/webhooks/paypal`. Register this URL in your PayPal Sandbox app and set the webhook ID in `PAYPAL_WEBHOOK_ID`.
 - Gmail sending expects `credentials.json` and `token.json` on the backend. Do not commit them. Provide them through Render secret files or another secure method.
 - Free services spin down when idle, so the first request after a pause can be slow.
@@ -352,10 +351,11 @@ PaidPilot/
 │   │   ├── features.py
 │   │   ├── predict.py
 │   │   └── train.py
-│   └── paypal/
-│       ├── client.py            # OAuth and API client
-│       ├── history.py           # Invoice history retrieval
-│       └── invoices.py          # Invoice creation and sending
+│   ├── paypal/
+│   │   ├── client.py            # OAuth and API client
+│   │   ├── history.py           # Invoice history retrieval
+│   │   └── invoices.py          # Invoice creation and sending
+│   └── manual_invoice.py
 ├── data/
 ├── models/
 │   └── payment_risk.pkl         # Trained risk model
@@ -367,13 +367,11 @@ PaidPilot/
 │   └── test_policy.py
 ├── ui/
 │   └── dashboard.py             # Streamlit dashboard
-├── manual_invoice.py
 ├── test_paypal.py               # Manual PayPal OAuth check
 ├── .env.example
 ├── .gitignore
 └── requirements.txt
 ```
-
 ---
 
 ## Testing
