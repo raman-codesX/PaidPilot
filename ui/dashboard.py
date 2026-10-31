@@ -1,5 +1,6 @@
 import html
 import os
+import time
 
 import requests
 import streamlit as st
@@ -125,34 +126,55 @@ st.markdown(
 )
 
 
-def api_request(method, endpoint, payload=None, timeout=30):
-    try:
-        response = requests.request(
-            method,
-            f"{API_URL}{endpoint}",
-            json=payload,
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        return response.json(), None
-    except requests.HTTPError as error:
+def api_request(method, endpoint, payload=None, timeout=30, retry_transient=False):
+    max_attempts = 3 if retry_transient else 1
+    transient_statuses = {502, 503, 504}
+
+    for attempt in range(max_attempts):
         try:
-            detail = error.response.json().get("detail", error.response.text)
-        except (ValueError, AttributeError):
-            detail = str(error)
-        return None, f"API error: {detail}"
-    except requests.RequestException as error:
-        return None, f"Could not connect to PaidPilot API at {API_URL}: {error}"
+            response = requests.request(
+                method,
+                f"{API_URL}{endpoint}",
+                json=payload,
+                timeout=timeout,
+            )
+            if (
+                retry_transient
+                and response.status_code in transient_statuses
+                and attempt + 1 < max_attempts
+            ):
+                time.sleep(attempt + 1)
+                continue
+
+            response.raise_for_status()
+            return response.json(), None
+        except (requests.ConnectionError, requests.Timeout) as error:
+            if retry_transient and attempt + 1 < max_attempts:
+                time.sleep(attempt + 1)
+                continue
+            return None, f"Could not connect to PaidPilot API at {API_URL}: {error}"
+        except requests.HTTPError as error:
+            try:
+                detail = error.response.json().get("detail", error.response.text)
+            except (ValueError, AttributeError):
+                detail = str(error)
+            return None, f"API error: {detail}"
+        except requests.RequestException as error:
+            return None, f"Could not connect to PaidPilot API at {API_URL}: {error}"
 
 
 def get_data(key, endpoint):
     data_key = f"{key}_data"
     error_key = f"{key}_error"
     if data_key not in st.session_state:
-        data, error = api_request("GET", endpoint)
-        st.session_state[data_key] = data
-        st.session_state[error_key] = error
-    return st.session_state[data_key], st.session_state[error_key]
+        data, error = api_request("GET", endpoint, retry_transient=True)
+        if error is None:
+            st.session_state[data_key] = data
+            st.session_state.pop(error_key, None)
+        else:
+            st.session_state.pop(data_key, None)
+            st.session_state[error_key] = error
+    return st.session_state.get(data_key), st.session_state.get(error_key)
 
 
 def get_recommendations(force=False):
@@ -162,11 +184,17 @@ def get_recommendations(force=False):
     if "recommendations_data" not in st.session_state:
         with st.spinner("Reviewing invoice history and preparing recommendations…"):
             data, error = api_request(
-                "POST", "/api/recommendations/portfolio", timeout=900
+                "POST",
+                "/api/recommendations/portfolio",
+                timeout=900,
+                retry_transient=True,
             )
-        st.session_state["recommendations_data"] = data
-        print("DEBUG: recommendations_data received")
-        st.session_state["recommendations_error"] = error
+        if error is None:
+            st.session_state["recommendations_data"] = data
+            st.session_state.pop("recommendations_error", None)
+        else:
+            st.session_state.pop("recommendations_data", None)
+            st.session_state["recommendations_error"] = error
     return (
         st.session_state.get("recommendations_data"),
         st.session_state.get("recommendations_error"),
