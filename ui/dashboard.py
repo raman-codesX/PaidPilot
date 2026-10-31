@@ -127,31 +127,53 @@ st.markdown(
 
 
 def api_request(method, endpoint, payload=None, timeout=30, retry_transient=False):
-    max_attempts = 3 if retry_transient else 1
     transient_statuses = {502, 503, 504}
+    retry_deadline = time.monotonic() + 90 if retry_transient else None
+    attempt = 0
+    last_error = None
 
-    for attempt in range(max_attempts):
+    while True:
+        remaining = (
+            retry_deadline - time.monotonic()
+            if retry_transient
+            else None
+        )
+        if retry_transient and remaining <= 0:
+            return None, last_error or (
+                f"Could not connect to PaidPilot API at {API_URL} "
+                "before the startup wait expired."
+            )
+
         try:
             response = requests.request(
                 method,
                 f"{API_URL}{endpoint}",
                 json=payload,
-                timeout=timeout,
+                timeout=min(timeout, remaining) if retry_transient else timeout,
             )
             if (
                 retry_transient
                 and response.status_code in transient_statuses
-                and attempt + 1 < max_attempts
             ):
-                time.sleep(attempt + 1)
-                continue
+                last_error = f"API error: {response.status_code} {response.reason}"
+                remaining = retry_deadline - time.monotonic()
+                if remaining > 0:
+                    time.sleep(min(2 ** attempt if attempt < 4 else 10, remaining))
+                    attempt += 1
+                    continue
 
             response.raise_for_status()
             return response.json(), None
         except (requests.ConnectionError, requests.Timeout) as error:
-            if retry_transient and attempt + 1 < max_attempts:
-                time.sleep(attempt + 1)
-                continue
+            if retry_transient:
+                last_error = (
+                    f"Could not connect to PaidPilot API at {API_URL}: {error}"
+                )
+                remaining = retry_deadline - time.monotonic()
+                if remaining > 0:
+                    time.sleep(min(2 ** attempt if attempt < 4 else 10, remaining))
+                    attempt += 1
+                    continue
             return None, f"Could not connect to PaidPilot API at {API_URL}: {error}"
         except requests.HTTPError as error:
             try:
@@ -167,7 +189,8 @@ def get_data(key, endpoint):
     data_key = f"{key}_data"
     error_key = f"{key}_error"
     if data_key not in st.session_state:
-        data, error = api_request("GET", endpoint, retry_transient=True)
+        with st.spinner("Connecting to PaidPilot backend. Render may take a minute to wake it up…"):
+            data, error = api_request("GET", endpoint, retry_transient=True)
         if error is None:
             st.session_state[data_key] = data
             st.session_state.pop(error_key, None)
@@ -182,7 +205,7 @@ def get_recommendations(force=False):
         st.session_state.pop("recommendations_data", None)
         st.session_state.pop("recommendations_error", None)
     if "recommendations_data" not in st.session_state:
-        with st.spinner("Reviewing invoice history and preparing recommendations…"):
+        with st.spinner("Connecting to the backend and preparing recommendations…"):
             data, error = api_request(
                 "POST",
                 "/api/recommendations/portfolio",
