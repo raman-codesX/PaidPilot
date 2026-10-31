@@ -27,3 +27,16 @@ def test_database_url_can_be_configured(monkeypatch):
     importlib.reload(session)
 
     assert session.DATABASE_URL == "sqlite:///./test_configured.db"
+
+def test_postgresql_url_uses_psycopg2(monkeypatch):
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql://user:password@localhost/testdb",
+    )
+
+    with patch("sqlalchemy.create_engine") as mock_create_engine:
+        importlib.reload(session)
+
+        database_url = mock_create_engine.call_args.args[0]
+
+        assert database_url.startswith("postgresql+psycopg2://")

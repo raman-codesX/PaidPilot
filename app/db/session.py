@@ -2,8 +2,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 
-id="m2o5z8"
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./paidpilot.db")
+
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+psycopg2://",
+        1,
+    )
 
 connect_args = {}
 
