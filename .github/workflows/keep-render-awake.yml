@@ -1,0 +1,17 @@
+name: Keep PaidPilot Awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  keep-awake:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wake PaidPilot backend
+        run: curl -fsS https://paidpilot-8q3o.onrender.com/api/dashboard/summary
+
+      - name: Wake PaidPilot frontend
+        run: curl -fsS https://paidpilot-ui.onrender.com
