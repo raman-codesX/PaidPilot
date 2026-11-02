@@ -362,8 +362,10 @@ PaidPilot/
 ├── tests/
 │   ├── test_action_history.py
 │   ├── test_agent.py
+|   ├── test_database.py
 │   ├── test_email_templates.py
 │   ├── test_gmail.py
+|   ├── test_invoice_creation.py
 │   └── test_policy.py
 ├── ui/
 │   └── dashboard.py             # Streamlit dashboard
